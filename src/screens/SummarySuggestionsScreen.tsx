@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Svg, { Circle, Polyline } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 
 import { getConversations } from '../api/conversations';
 import { InsightCard } from '../types/InsightCard';
@@ -512,30 +512,6 @@ export function SummarySuggestionsScreen({ refreshKey = 0 }: SummarySuggestionsS
       return null;
     }
 
-    const sortedRecent = [...items]
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .slice(-6);
-
-    // 1) Line graph: use recent conversation amounts only.
-    const lineSeries = sortedRecent
-      .map((entry) => {
-        const amount = parseAmountToRupees(resolveAmountText(entry));
-        if (!amount || amount <= 0) {
-          return null;
-        }
-
-        const d = new Date(entry.timestamp);
-        const label = `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`;
-        return {
-          label,
-          valueLakhs: Number((amount / 100000).toFixed(2)),
-        };
-      })
-      .filter((entry): entry is { label: string; valueLakhs: number } => Boolean(entry));
-
-    const lineValues = lineSeries.map((entry) => entry.valueLakhs);
-    const lineLabels = lineSeries.map((entry) => entry.label);
-
     // 2) Pie chart: distribution from multilingual keyword matches in latest conversation.
     const analysisText = [
       latestConversation.structured_summary.topic,
@@ -631,12 +607,9 @@ export function SummarySuggestionsScreen({ refreshKey = 0 }: SummarySuggestionsS
     const latestAmount = resolveAmountText(latestConversation);
 
     return {
-      lineValues,
-      lineLabels,
       pieWithOffsets,
       barData,
       amountLabel: latestAmount,
-      hasLineData: lineValues.length >= 2,
       hasPieData: signalTotal > 0,
       hasBarData: barData.length >= 2,
     };
@@ -718,56 +691,6 @@ export function SummarySuggestionsScreen({ refreshKey = 0 }: SummarySuggestionsS
                     </View>
                   </View>
                 ))}
-              </View>
-            </View>
-          ) : null}
-
-          {chartInsights ? (
-            <View style={styles.cardBlock}>
-              <Text style={styles.blockTitle}>1. Line Graph - Financial Decision Timeline</Text>
-              <Text style={styles.blockBody}>
-                Shows how financial commitment can grow month by month based on the discussed amount.
-              </Text>
-              <View style={styles.graphPanel}>
-                {chartInsights.hasLineData ? (
-                  <>
-                    <Svg width="100%" height={170} viewBox="0 0 320 170">
-                      <Polyline
-                        points={chartInsights.lineValues
-                          .map((value, index) => {
-                            const count = chartInsights.lineValues.length;
-                            const x = count === 1 ? 160 : 24 + index * (272 / (count - 1));
-                            const max = Math.max(...chartInsights.lineValues, 1);
-                            const y = 136 - (value / max) * 92;
-                            return `${x},${y}`;
-                          })
-                          .join(' ')}
-                        fill="none"
-                        stroke="#22c55e"
-                        strokeWidth={3}
-                      />
-                      {chartInsights.lineValues.map((value, index) => {
-                        const count = chartInsights.lineValues.length;
-                        const x = count === 1 ? 160 : 24 + index * (272 / (count - 1));
-                        const max = Math.max(...chartInsights.lineValues, 1);
-                        const y = 136 - (value / max) * 92;
-                        return <Circle key={`line-point-${index}`} cx={x} cy={y} r={4} fill="#38bdf8" />;
-                      })}
-                    </Svg>
-                    <View style={styles.monthAxisRow}>
-                      {chartInsights.lineLabels.map((label) => (
-                        <Text key={label} style={styles.axisLabel}>
-                          {label}
-                        </Text>
-                      ))}
-                    </View>
-                    <Text style={styles.graphCaption}>Trend uses recent conversations with numeric amount mentions.</Text>
-                  </>
-                ) : (
-                  <Text style={styles.graphNoDataText}>
-                    Not enough recent numeric amount data to draw this timeline yet.
-                  </Text>
-                )}
               </View>
             </View>
           ) : null}
@@ -1032,30 +955,6 @@ const styles = StyleSheet.create({
   metricFill: {
     height: '100%',
     borderRadius: 999,
-  },
-  graphPanel: {
-    borderWidth: 1,
-    borderColor: '#243041',
-    borderRadius: 12,
-    backgroundColor: '#0b1220',
-    padding: 10,
-  },
-  monthAxisRow: {
-    marginTop: -8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-  },
-  axisLabel: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  graphCaption: {
-    marginTop: 8,
-    color: '#94a3b8',
-    fontSize: 12,
-    lineHeight: 18,
   },
   graphNoDataText: {
     color: '#94a3b8',

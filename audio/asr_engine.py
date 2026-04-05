@@ -48,6 +48,11 @@ _WHISPER_MODELS: Dict[str, WhisperModel] = {}
 _WAV2VEC_MODELS: Dict[str, tuple[Wav2Vec2Processor, Wav2Vec2ForCTC]] = {}
 
 
+ASR_FAST_MODE = os.environ.get("ASR_FAST_MODE", "1").lower() in {"1", "true", "yes", "on"}
+ASR_ULTRA_FAST_MODE = os.environ.get("ASR_ULTRA_FAST_MODE", "1").lower() in {"1", "true", "yes", "on"}
+LANG_DETECT_MODEL_SIZE = os.environ.get("ASR_LANG_DETECT_MODEL", "tiny" if ASR_FAST_MODE else "small")
+
+
 def get_whisper_model(model_size: str = 'small') -> WhisperModel:
     """Get or create a cached WhisperModel instance."""
     if model_size not in _WHISPER_MODELS:
@@ -88,11 +93,19 @@ def detect_audio_language(audio_path: str) -> Dict[str, Any]:
     try:
         logger.info(f"[LANG_DETECT] Starting language detection on {Path(audio_path).name}")
         
-        # Use cached model for fast repeated requests
-        model = get_whisper_model('small')
+        # Use a lightweight model in fast mode for quicker language routing.
+        model = get_whisper_model(LANG_DETECT_MODEL_SIZE)
         
         # Transcribe for language detection only
-        segments, info = model.transcribe(audio_path, without_timestamps=True)
+        segments, info = model.transcribe(
+            audio_path,
+            without_timestamps=True,
+            beam_size=1 if ASR_FAST_MODE else 5,
+            best_of=1 if ASR_FAST_MODE else 3,
+            vad_filter=True if ASR_FAST_MODE else False,
+            condition_on_previous_text=False if ASR_FAST_MODE else True,
+            temperature=0.0,
+        )
         segments_list = list(segments)
         transcribed_text = ' '.join([seg.text for seg in segments_list])
         
@@ -294,29 +307,33 @@ def transcribe_with_whisper(
         )
         
         model = get_whisper_model(model_size)
+        beam_size = 1 if ASR_FAST_MODE else 5
+        best_of = 1 if ASR_FAST_MODE else 3
+        use_vad = True if ASR_FAST_MODE else False
+        condition_prev = False if ASR_FAST_MODE else True
         
         # Pass 1: language-guided decode (if available)
         segments, _ = model.transcribe(
             audio_path,
             language=whisper_language,
-            beam_size=5,
-            best_of=3,
-            vad_filter=False,
-            condition_on_previous_text=True,
+            beam_size=beam_size,
+            best_of=best_of,
+            vad_filter=use_vad,
+            condition_on_previous_text=condition_prev,
             temperature=0.0,
         )
         transcript = ' '.join(seg.text for seg in list(segments)).strip()
 
         # Pass 2: if empty output, retry with auto-language decode
-        if not transcript:
+        if not transcript and not ASR_ULTRA_FAST_MODE:
             logger.info("[WHISPER] Empty transcript on pass 1, retrying with auto language")
             retry_segments, _ = model.transcribe(
                 audio_path,
                 language=None,
-                beam_size=5,
-                best_of=3,
-                vad_filter=False,
-                condition_on_previous_text=True,
+                beam_size=beam_size,
+                best_of=best_of,
+                vad_filter=use_vad,
+                condition_on_previous_text=condition_prev,
                 temperature=0.0,
             )
             transcript = ' '.join(seg.text for seg in list(retry_segments)).strip()
@@ -409,6 +426,19 @@ class ASREngine:
             }
         
         try:
+            if ASR_ULTRA_FAST_MODE:
+                logger.info("[TRANS] Ultra-fast mode enabled: skipping language detection and model routing")
+                whisper_size = os.environ.get('WHISPER_MODEL_SIZE', 'tiny')
+                raw_text = transcribe_with_whisper(audio_path, None, model_size=whisper_size) or ''
+                return {
+                    'chunk_id': chunk_id,
+                    'transcript': raw_text.strip(),
+                    'language': 'unknown',
+                    'confidence': 0.0,
+                    'model_used': f'openai/whisper-{whisper_size}',
+                    'is_code_mixed': True
+                }
+
             # Step 1: Detect language
             logger.info("[TRANS] Step 1/5: Language detection...")
             lang_info = detect_audio_language(audio_path)
@@ -434,36 +464,18 @@ class ASREngine:
             # Step 4: Fall back to Whisper if needed
             if raw_text is None or raw_text.strip() == '':
                 logger.info("[TRANS] Step 4/5: Fallback to Whisper...")
-                # Use higher-capacity model for quality on longer real conversations.
-                whisper_size = 'large-v3' if is_code_mixed or (language or '').startswith('hi') else 'small'
+                # Fast mode uses a single decode pass with one optional retry.
+                whisper_size = os.environ.get(
+                    'WHISPER_MODEL_SIZE',
+                    'tiny' if ASR_FAST_MODE else ('large-v3' if is_code_mixed or (language or '').startswith('hi') else 'small')
+                )
 
-                # Try multiple language hints and pick the best-quality transcript.
-                candidate_languages = []
-                if confidence > 0.5 and language and language != 'unknown':
-                    candidate_languages.append(language)
-                else:
-                    candidate_languages.extend(['hi', 'en'])
-                candidate_languages.append(None)
+                primary_lang = language if confidence > 0.5 and language and language != 'unknown' else None
+                raw_text = transcribe_with_whisper(audio_path, primary_lang, model_size=whisper_size)
 
-                seen = set()
-                best_text = ''
-                best_score = -1.0
-                for lang_code in candidate_languages:
-                    normalized = _normalize_whisper_language(lang_code)
-                    if normalized in seen:
-                        continue
-                    seen.add(normalized)
+                if (raw_text is None or not raw_text.strip()) and primary_lang is not None:
+                    raw_text = transcribe_with_whisper(audio_path, None, model_size=whisper_size)
 
-                    candidate = transcribe_with_whisper(audio_path, normalized, model_size=whisper_size)
-                    score = _score_transcript_quality(candidate or '')
-                    logger.info(
-                        f"[TRANS] Whisper candidate lang={normalized or 'auto'} score={score:.3f}"
-                    )
-                    if score > best_score:
-                        best_score = score
-                        best_text = candidate or ''
-
-                raw_text = best_text
                 model_name = f'openai/whisper-{whisper_size}'  # Update model used
             
             # Step 5: Ensure we have something

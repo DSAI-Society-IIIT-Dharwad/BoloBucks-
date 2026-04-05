@@ -24,7 +24,6 @@ from backend.database import (
 from backend.orchestrator import PipelineOrchestrator
 from backend.schemas import InsightCardResponse, ConversationUpdateBody
 from backend.insight_postprocess import normalize_card_payload
-from audio_processor import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -144,16 +143,9 @@ async def process_audio(
     with open(temp_audio_path, "wb") as f:
         f.write(content)
 
-    converted_audio_path = temp_audio_path
-    if temp_audio_path.suffix.lower() != ".wav":
-        converted_audio_path, _ = AudioProcessor.convert_to_target_format(
-            str(temp_audio_path),
-            chunk_id,
-        )
-    
     audio_chunk = {
         "audio_bytes": content,
-        "audio_path": converted_audio_path,  # ASR engine expects file path
+        "audio_path": str(temp_audio_path),  # ASR engine expects file path
         "chunk_id": chunk_id,
         "sample_rate": 16000,
         "filename": uploaded_file.filename,

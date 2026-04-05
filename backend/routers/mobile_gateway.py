@@ -20,7 +20,6 @@ from backend.database import save_conversation
 from backend.orchestrator import PipelineOrchestrator
 from backend.schemas import MobileUploadResponse
 from backend.insight_postprocess import normalize_card_payload
-from audio_processor import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -130,17 +129,10 @@ async def upload_audio(
         with open(temp_audio_path, "wb") as f:
             f.write(content)
 
-        converted_audio_path = str(temp_audio_path)
-        if temp_audio_path.suffix.lower() != ".wav":
-            converted_audio_path, _ = AudioProcessor.convert_to_target_format(
-                str(temp_audio_path),
-                chunk_id,
-            )
-        
         # Pass directly to pipeline (ASR engine will handle format)
         audio_chunk = {
             "audio_bytes": content,
-            "audio_path": converted_audio_path,  # ASR engine will use this for processing
+            "audio_path": str(temp_audio_path),  # ASR engine will use this for processing
             "chunk_id": chunk_id,
             "sample_rate": 16000,
             "filename": uploaded_file.filename or "audio",

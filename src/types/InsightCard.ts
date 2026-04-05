@@ -19,6 +19,7 @@ export interface InsightCard {
     decision: string | null;
     sentiment: string;
     next_action: string | null;
+    confidence_explanation?: string;
   };
   sentiment: string;
   confidence_score: number;

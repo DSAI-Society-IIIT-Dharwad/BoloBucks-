@@ -19,6 +19,7 @@ interface BackendConversationResponse {
   entities?: Record<string, any> | null;
   summary?: Record<string, any> | null;
   confidence_score?: number | string | null;
+  confidence_explanation?: string | null;
   flagged_for_review?: boolean | string | number | null;
 }
 
@@ -96,6 +97,7 @@ function transformInsightCard(card: BackendConversationResponse | any): InsightC
       decision: summary.decision ?? null,
       sentiment,
       next_action: summary.next_action ?? null,
+      confidence_explanation: String(summary.confidence_explanation || card.confidence_explanation || ''),
     },
     sentiment,
     confidence_score: Number(card.confidence_score ?? 0),

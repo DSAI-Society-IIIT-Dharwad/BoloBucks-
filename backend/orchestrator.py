@@ -74,12 +74,46 @@ def _empty_card(
         "sentiment": "neutral",
         "next_action": "manual review required",
         "confidence_score": 0.0,
+        "confidence_explanation": "",
         "raw_transcript": transcript,
         "language_detected": "unknown",
         "entities": entities or {},
         "flagged_for_review": flagged,
         "error": error,
     }
+
+
+def _build_confidence_explanation(transcript: str, entities: dict, insight_card: dict) -> str:
+    confidence_score = float(insight_card.get("confidence_score", 0.0) or 0.0)
+    topic = str(insight_card.get("topic", "unknown") or "unknown")
+
+    entity_conf = entities.get("confidence_scores", {}) if isinstance(entities, dict) else {}
+    strongest_signals = []
+
+    for key in ("instruments", "amounts", "decisions", "persons"):
+        value = float(entity_conf.get(key, 0.0) or 0.0)
+        if value > 0:
+            strongest_signals.append(f"{key}={value:.2f}")
+
+    if confidence_score >= 0.8:
+        level = "high"
+    elif confidence_score >= 0.6:
+        level = "moderate"
+    else:
+        level = "low"
+
+    if strongest_signals:
+        signals_text = ", ".join(strongest_signals[:3])
+    else:
+        signals_text = "no strong entity matches"
+
+    transcript_length = len((transcript or "").split())
+    length_text = "longer transcript" if transcript_length >= 25 else "shorter transcript"
+
+    return (
+        f"{level.capitalize()} confidence because the topic appears to be '{topic}', "
+        f"supported by {signals_text} and a {length_text}."
+    )
 
 
 # ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -182,6 +216,8 @@ class PipelineOrchestrator:
                      "sentiment", "next_action", "confidence_score"):
             if key in insight_card:
                 card[key] = insight_card[key]
+
+        card["confidence_explanation"] = _build_confidence_explanation(transcript, entities, insight_card)
 
         # Preserve any extra keys the generator added (e.g. _mock, error)
         for key, value in insight_card.items():

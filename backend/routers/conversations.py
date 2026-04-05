@@ -90,6 +90,7 @@ def _conv_to_card(conv) -> dict:
         "entities": normalized["entities"],
         "summary": normalized["summary"],
         "confidence_score": normalized["confidence_score"],
+        "confidence_explanation": normalized["summary"].get("confidence_explanation", ""),
         "flagged_for_review": normalized["flagged_for_review"],
     }
 
@@ -174,6 +175,7 @@ async def process_audio(
             "decision": insight_card.get("decision", "unknown"),
             "sentiment": insight_card.get("sentiment", "neutral"),
             "next_action": insight_card.get("next_action", "unknown"),
+            "confidence_explanation": insight_card.get("confidence_explanation", ""),
         }),
         confidence_score=float(insight_card.get("confidence_score", 0.0)),
         flagged_for_review=bool(insight_card.get("flagged_for_review", False)),

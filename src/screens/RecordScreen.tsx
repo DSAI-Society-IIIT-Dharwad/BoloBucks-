@@ -284,6 +284,12 @@ export function RecordScreen({ navigation }: any) {
       contentContainerStyle={styles.contentContainer}
       scrollEnabled={false}
     >
+      <View style={styles.hero}>
+        <Text style={[styles.heroEyebrow, { color: colors.accent }]}>Voice capture</Text>
+        <Text style={[styles.heroTitle, { color: colors.text }]}>Record a conversation and upload it for analysis.</Text>
+        <Text style={[styles.heroBody, { color: colors.textSecondary }]}>Use the mic or upload a file. The app will transcribe, analyze, and route you to the result.</Text>
+      </View>
+
       {/* Privacy Card - Condensed */}
       <View style={[styles.privacyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.privacyHeader}>
@@ -395,16 +401,38 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 16,
-    paddingTop: 32,
-    paddingBottom: 40,
+    paddingTop: 20,
+    paddingBottom: 24,
     alignItems: 'center',
+  },
+  hero: {
+    width: '100%',
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  heroEyebrow: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  heroTitle: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  heroBody: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 
   // Privacy Card - Improved spacing & hierarchy
   privacyCard: {
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 48,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 30,
     width: '100%',
     borderWidth: 1,
     shadowColor: '#000',
@@ -436,7 +464,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   recordButtonContainer: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   recordButton: {
     width: 140,
@@ -477,7 +505,7 @@ const styles = StyleSheet.create({
     gap: 8,
     width: '100%',
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   uploadButtonText: {

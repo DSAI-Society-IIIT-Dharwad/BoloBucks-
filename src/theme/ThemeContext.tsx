@@ -2,15 +2,20 @@ import React, { createContext, useContext } from 'react';
 
 const defaultTheme = {
   colors: {
-    background: '#f6f8fb',
-    card: '#ffffff',
-    border: '#d1d5db',
-    text: '#111827',
-    textSecondary: '#4b5563',
-    primary: '#2563eb',
-    accent: '#0f766e',
-    danger: '#dc2626',
-    overlay: 'rgba(17, 24, 39, 0.35)',
+    background: '#050816',
+    surface: '#0b1120',
+    card: '#111827',
+    cardElevated: '#182033',
+    border: '#243041',
+    text: '#f8fafc',
+    textSecondary: '#94a3b8',
+    primary: '#22c55e',
+    accent: '#38bdf8',
+    success: '#16a34a',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    overlay: 'rgba(2, 6, 23, 0.55)',
+    muted: '#64748b',
   },
 };
 

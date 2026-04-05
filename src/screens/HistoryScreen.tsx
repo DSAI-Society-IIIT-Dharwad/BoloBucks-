@@ -69,7 +69,10 @@ export function HistoryScreen({ refreshKey = 0, focusConversationId = null }: Hi
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>History</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>History</Text>
+        <Text style={styles.subtitle}>Browse processed conversations and review extracted insights.</Text>
+      </View>
 
       {loading ? (
         <View style={styles.centered}>
@@ -133,14 +136,21 @@ export function HistoryScreen({ refreshKey = 0, focusConversationId = null }: Hi
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
+    backgroundColor: '#050816',
     padding: 12,
+  },
+  header: {
+    marginBottom: 12,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f9fafb',
-    marginBottom: 12,
+    color: '#f8fafc',
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
   },
   centered: {
     alignItems: 'center',
@@ -168,35 +178,36 @@ const styles = StyleSheet.create({
   item: {
     borderWidth: 1,
     borderColor: '#1f2937',
-    backgroundColor: '#111827',
-    borderRadius: 10,
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
     padding: 10,
     marginBottom: 8,
   },
   itemActive: {
     borderColor: '#22c55e',
+    backgroundColor: '#111827',
   },
   itemTitle: {
-    color: '#f9fafb',
+    color: '#f8fafc',
     fontWeight: '600',
     marginBottom: 4,
   },
   itemSubtitle: {
-    color: '#9ca3af',
+    color: '#94a3b8',
     fontSize: 12,
   },
   detailPanel: {
     flex: 2,
     borderWidth: 1,
     borderColor: '#1f2937',
-    backgroundColor: '#111827',
-    borderRadius: 10,
-    padding: 14,
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
+    padding: 16,
   },
   detailHeading: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#f9fafb',
+    color: '#f8fafc',
     marginBottom: 8,
   },
   detailMeta: {
@@ -210,7 +221,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionBody: {
-    color: '#e5e7eb',
-    lineHeight: 20,
+    color: '#e2e8f0',
+    lineHeight: 21,
   },
 });

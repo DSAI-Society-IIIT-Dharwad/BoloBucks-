@@ -74,7 +74,10 @@ export function DashboardScreen({ refreshKey = 0 }: DashboardScreenProps) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Dashboard</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Dashboard</Text>
+        <Text style={styles.subtitle}>A live snapshot of your conversation analysis.</Text>
+      </View>
 
       {loading ? (
         <View style={styles.centered}>
@@ -126,16 +129,23 @@ export function DashboardScreen({ refreshKey = 0 }: DashboardScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
+    backgroundColor: '#050816',
   },
   content: {
     padding: 12,
   },
+  header: {
+    marginBottom: 12,
+  },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f9fafb',
-    marginBottom: 12,
+    color: '#f8fafc',
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
   },
   centered: {
     alignItems: 'center',
@@ -157,25 +167,25 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: '#1f2937',
-    backgroundColor: '#111827',
-    borderRadius: 10,
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
     padding: 12,
     marginRight: 8,
   },
   cardLabel: {
-    color: '#9ca3af',
+    color: '#94a3b8',
     marginBottom: 4,
   },
   cardValue: {
-    color: '#f9fafb',
+    color: '#f8fafc',
     fontSize: 28,
     fontWeight: '700',
   },
   cardBlock: {
     borderWidth: 1,
     borderColor: '#1f2937',
-    backgroundColor: '#111827',
-    borderRadius: 10,
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
     padding: 12,
     marginBottom: 12,
   },
@@ -185,7 +195,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   blockBody: {
-    color: '#e5e7eb',
+    color: '#e2e8f0',
     marginBottom: 4,
   },
 });

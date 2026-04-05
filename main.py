@@ -17,7 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from mobile_gateway import router as mobile_router
-from demo import router as demo_router
+try:
+    from demo import router as demo_router
+except ImportError:
+    demo_router = None
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -42,7 +45,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(mobile_router)
 
 # Mount demo data router (if DEMO_MODE enabled)
-app.include_router(demo_router)
+if demo_router is not None:
+    app.include_router(demo_router)
 
 
 @app.get("/")

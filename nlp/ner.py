@@ -13,8 +13,12 @@ Usage:
 """
 
 import re
-import spacy
 from typing import Dict, List
+
+try:
+    import spacy
+except ImportError:
+    spacy = None
 
 
 class FinancialNER:
@@ -23,12 +27,16 @@ class FinancialNER:
     def __init__(self):
         """Initialize spaCy model and pattern lists."""
         print('[NER] Loading spaCy model...')
-        try:
-            self.nlp = spacy.load('en_core_web_sm')
-            print('[NER] spaCy loaded successfully.')
-        except OSError:
-            print('[NER] ERROR: spaCy model not found. Run: python -m spacy download en_core_web_sm')
+        if spacy is None:
+            print('[NER] spaCy not installed, using regex-only fallback.')
             self.nlp = None
+        else:
+            try:
+                self.nlp = spacy.load('en_core_web_sm')
+                print('[NER] spaCy loaded successfully.')
+            except OSError:
+                print('[NER] ERROR: spaCy model not found. Run: python -m spacy download en_core_web_sm')
+                self.nlp = None
         
         # Pattern lists — covers Hindi, English and Hinglish variants
         self.INSTRUMENT_PATTERNS = [

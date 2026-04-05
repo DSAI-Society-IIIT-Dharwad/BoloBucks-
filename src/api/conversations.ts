@@ -132,6 +132,11 @@ interface UploadResponse {
   data?: InsightCard;
 }
 
+interface AudioUploadMetadata {
+  fileName?: string;
+  mimeType?: string;
+}
+
 function extractErrorMessage(error: any, fallback: string): string {
   const detail = error?.response?.data?.detail;
 
@@ -176,20 +181,24 @@ function extractErrorMessage(error: any, fallback: string): string {
 
 async function buildProcessFormData(
   fileUri: string,
+  metadata?: AudioUploadMetadata,
 ): Promise<FormData> {
   const formData = new FormData();
+
+  const fileName = metadata?.fileName || `recording_${Date.now()}.m4a`;
+  const mimeType = metadata?.mimeType || 'audio/m4a';
 
   if (Platform.OS === 'web') {
     const blobResponse = await fetch(fileUri);
     const blob = await blobResponse.blob();
-    const ext = blob.type?.includes('webm') ? 'webm' : blob.type?.includes('wav') ? 'wav' : 'm4a';
-    const fileName = `recording_${Date.now()}.${ext}`;
-    formData.append('file', blob, fileName);
+    const blobType = mimeType || blob.type || 'audio/m4a';
+    const uploadBlob = blobType && blob.type !== blobType ? blob.slice(0, blob.size, blobType) : blob;
+    formData.append('file', uploadBlob, fileName);
   } else {
     formData.append('file', {
       uri: fileUri,
-      type: 'audio/m4a',
-      name: `recording_${Date.now()}.m4a`,
+      type: mimeType,
+      name: fileName,
     } as any);
   }
 
@@ -199,9 +208,10 @@ async function buildProcessFormData(
 async function buildMobileUploadFormData(
   fileUri: string,
   deviceId: string,
-  recordedAt: string
+  recordedAt: string,
+  metadata?: AudioUploadMetadata,
 ): Promise<FormData> {
-  const formData = await buildProcessFormData(fileUri);
+  const formData = await buildProcessFormData(fileUri, metadata);
   formData.append('device_id', deviceId);
   formData.append('recorded_at', recordedAt);
   return formData;
@@ -217,7 +227,8 @@ async function buildMobileUploadFormData(
 export async function uploadAudio(
   fileUri: string,
   deviceId: string,
-  recordedAt: string
+  recordedAt: string,
+  metadata?: AudioUploadMetadata,
 ): Promise<UploadResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
@@ -225,8 +236,8 @@ export async function uploadAudio(
   try {
     const isWeb = Platform.OS === 'web';
     const formData = isWeb
-      ? await buildProcessFormData(fileUri)
-      : await buildMobileUploadFormData(fileUri, deviceId, recordedAt);
+      ? await buildProcessFormData(fileUri, metadata)
+      : await buildMobileUploadFormData(fileUri, deviceId, recordedAt, metadata);
 
     const endpoint = isWeb
       ? `${BASE_URL}/v1/conversations/process`

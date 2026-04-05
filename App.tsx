@@ -1,20 +1,77 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ThemeProvider } from './src/theme/ThemeContext';
+import { AuthScreen } from './src/screens/AuthScreen';
 import { RecordScreen } from './src/screens/RecordScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { SummarySuggestionsScreen } from './src/screens/SummarySuggestionsScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 
-type TabId = 'record' | 'history' | 'dashboard' | 'summary';
+type TabId = 'record' | 'history' | 'dashboard' | 'summary' | 'profile' | 'settings';
 
 export default function App() {
+  const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup');
+  const [registeredCredentials, setRegisteredCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [authMessage, setAuthMessage] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   const [tab, setTab] = useState<TabId>('record');
   const [refreshKey, setRefreshKey] = useState(0);
   const [focusConversationId, setFocusConversationId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerTranslateX = useRef(new Animated.Value(-320)).current;
+
+  const handleAuthSubmit = (payload: { email: string; password: string }) => {
+    setAuthError('');
+    setAuthMessage('');
+
+    if (authMode === 'signup') {
+      setRegisteredCredentials({
+        email: payload.email.toLowerCase(),
+        password: payload.password,
+      });
+      setAuthMode('login');
+      setAuthMessage('Sign up successful. Please log in with your new credentials.');
+      return;
+    }
+
+    if (!registeredCredentials) {
+      setAuthError('No account found. Please sign up first.');
+      setAuthMode('signup');
+      return;
+    }
+
+    const emailMatches = payload.email.toLowerCase() === registeredCredentials.email;
+    const passwordMatches = payload.password === registeredCredentials.password;
+    if (!emailMatches || !passwordMatches) {
+      setAuthError('Invalid email or password. Please try again.');
+      return;
+    }
+
+    setIsAuthenticated(true);
+    setAuthMessage('');
+    setAuthError('');
+  };
+
+  const handleSwitchAuthMode = () => {
+    setAuthError('');
+    setAuthMessage('');
+    setAuthMode((prev) => (prev === 'signup' ? 'login' : 'signup'));
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setDrawerOpen(false);
+    drawerTranslateX.setValue(-320);
+    setTab('record');
+    setAuthMode('login');
+    setAuthMessage('Logged out successfully. Please log in again.');
+    setAuthError('');
+  };
 
   const openDrawer = () => {
     setDrawerOpen(true);
@@ -54,8 +111,19 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <SafeAreaView style={styles.safeRoot}>
-        <View style={styles.appRoot}>
+      {!isAuthenticated ? (
+        <SafeAreaView style={styles.safeRoot}>
+          <AuthScreen
+            mode={authMode}
+            message={authMessage}
+            error={authError}
+            onSubmit={handleAuthSubmit}
+            onSwitchMode={handleSwitchAuthMode}
+          />
+        </SafeAreaView>
+      ) : (
+        <SafeAreaView style={styles.safeRoot}>
+          <View style={styles.appRoot}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Pressable
@@ -69,14 +137,21 @@ export default function App() {
                 <View style={styles.menuLine} />
               </Pressable>
 
+              <Image source={require('./assets/app-logo.jpeg')} style={styles.headerLogo} resizeMode="cover" />
+
               <View>
                 <Text style={styles.brand}>Armour.AI</Text>
                 <Text style={styles.tagline}>Record conversations, review insights, track trends</Text>
               </View>
             </View>
-            <View style={styles.headerPill}>
-              <Text style={styles.headerPillDot}>●</Text>
-              <Text style={styles.headerPillText}>Live web test</Text>
+            <View style={styles.headerRight}>
+              <View style={styles.headerPill}>
+                <Text style={styles.headerPillDot}>●</Text>
+                <Text style={styles.headerPillText}>Live web test</Text>
+              </View>
+              <Pressable style={styles.logoutButton} onPress={handleLogout}>
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -91,6 +166,15 @@ export default function App() {
                   </Pressable>
                 </View>
 
+                <DrawerItem
+                  icon="account-circle-outline"
+                  label="Profile"
+                  active={tab === 'profile'}
+                  onPress={() => {
+                    setTab('profile');
+                    closeDrawer();
+                  }}
+                />
                 <DrawerItem
                   icon="microphone"
                   label="Record"
@@ -127,6 +211,15 @@ export default function App() {
                     closeDrawer();
                   }}
                 />
+                <DrawerItem
+                  icon="cog-outline"
+                  label="Settings"
+                  active={tab === 'settings'}
+                  onPress={() => {
+                    setTab('settings');
+                    closeDrawer();
+                  }}
+                />
               </Animated.View>
             </View>
           ) : null}
@@ -139,10 +232,13 @@ export default function App() {
               ) : null}
               {tab === 'dashboard' ? <DashboardScreen refreshKey={refreshKey} /> : null}
               {tab === 'summary' ? <SummarySuggestionsScreen refreshKey={refreshKey} /> : null}
+              {tab === 'profile' ? <ProfileScreen email={registeredCredentials?.email || ''} /> : null}
+              {tab === 'settings' ? <SettingsScreen /> : null}
             </View>
           </View>
-        </View>
-      </SafeAreaView>
+          </View>
+        </SafeAreaView>
+      )}
     </ThemeProvider>
   );
 }
@@ -199,6 +295,18 @@ const styles = StyleSheet.create({
     gap: 12,
     flexShrink: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerLogo: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+  },
   menuButton: {
     width: 42,
     height: 42,
@@ -218,7 +326,8 @@ const styles = StyleSheet.create({
   },
   drawerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10,
+    zIndex: 2000,
+    elevation: 2000,
     justifyContent: 'flex-start',
   },
   drawer: {
@@ -237,7 +346,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    elevation: 2001,
+    zIndex: 2001,
   },
   drawerHeader: {
     flexDirection: 'row',
@@ -312,6 +422,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: -1,
   },
+  logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#111827',
+    borderColor: '#1f2937',
+    borderWidth: 1,
+  },
+  logoutButtonText: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   contentShell: {
     flex: 1,
     backgroundColor: '#0a1020',
@@ -324,6 +447,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 5,
+    zIndex: 1,
   },
   content: {
     flex: 1,

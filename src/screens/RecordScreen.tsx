@@ -17,6 +17,27 @@ import { useTheme } from '../theme/ThemeContext';
 
 type RecordingState = 'idle' | 'recording' | 'processing' | 'error';
 
+function inferMimeTypeFromName(fileName: string): string {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.mp3')) return 'audio/mpeg';
+  if (lower.endsWith('.aac')) return 'audio/aac';
+  if (lower.endsWith('.ogg')) return 'audio/ogg';
+  if (lower.endsWith('.m4a')) return 'audio/m4a';
+  if (lower.endsWith('.webm')) return 'audio/webm';
+  return 'audio/m4a';
+}
+
+function inferFileNameFromUri(uri: string): string {
+  const sanitizedUri = uri.split('?')[0];
+  const maybeName = sanitizedUri.substring(sanitizedUri.lastIndexOf('/') + 1);
+  const fileName = maybeName || `recording_${Date.now()}.m4a`;
+  if (fileName.includes('.')) {
+    return fileName;
+  }
+  return `${fileName}.m4a`;
+}
+
 export function RecordScreen({ navigation }: any) {
   const { theme } = useTheme();
   const { colors } = theme;
@@ -181,9 +202,13 @@ export function RecordScreen({ navigation }: any) {
       // Prepare upload data
       const recordedAt = new Date().toISOString();
       const deviceId = deviceIdRef.current;
+      const recordedFileName = inferFileNameFromUri(uri);
 
       // Upload audio
-      const response = await uploadAudio(uri, deviceId, recordedAt);
+      const response = await uploadAudio(uri, deviceId, recordedAt, {
+        fileName: recordedFileName,
+        mimeType: inferMimeTypeFromName(recordedFileName),
+      });
 
       // Success - navigate to insight screen
       setState('idle');
@@ -233,10 +258,20 @@ export function RecordScreen({ navigation }: any) {
         return;
       }
 
+      // Reuse the same processing UI shown for recorded audio uploads.
+      setState('processing');
+
+      const selectedFileName = selectedFile.name || inferFileNameFromUri(selectedFile.uri);
+      const selectedMimeType = selectedFile.mimeType || inferMimeTypeFromName(selectedFileName);
+
       const response = await uploadAudio(
         selectedFile.uri,
         deviceIdRef.current,
-        new Date().toISOString()
+        new Date().toISOString(),
+        {
+          fileName: selectedFileName,
+          mimeType: selectedMimeType,
+        }
       );
 
       if (!response.conversation_id) {
@@ -340,11 +375,13 @@ export function RecordScreen({ navigation }: any) {
 
         {/* Button Label */}
         <Text style={[styles.buttonLabel, { color: colors.textSecondary }]}>
-          {state === 'idle' && 'Tap to start recording'}
-          {state === 'recording' && 'Recording... Tap to stop'}
-          {state === 'processing' && 'Processing...'}
-          {isUploading && 'Uploading...'}
-          {state === 'error' && 'Error occurred'}
+          {state === 'error'
+            ? 'Error occurred'
+            : state === 'recording'
+              ? 'Recording... Tap to stop'
+              : state === 'processing'
+                ? 'Uploading and processing...'
+                : 'Tap to start recording'}
         </Text>
 
         <TouchableOpacity

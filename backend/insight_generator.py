@@ -76,7 +76,8 @@ def _generate_mock_response(transcript: str, entities: dict) -> Dict[str, Any]:
     """Return heuristic fallback when Gemini is unavailable."""
     logger.warning("Gemini unavailable, using heuristic fallback insights.")
     insight = _heuristic_insight(transcript, entities)
-    insight["flagged_for_review"] = True
+    # Keep heuristic risk assessment instead of forcing every mock response as flagged.
+    insight["flagged_for_review"] = bool(insight.get("flagged_for_review", False))
     insight["_mock"] = True
     insight["error"] = "Gemini unavailable; heuristic summary used"
     return insight

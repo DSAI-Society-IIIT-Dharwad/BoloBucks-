@@ -8,6 +8,32 @@ interface DashboardScreenProps {
   refreshKey?: number;
 }
 
+function canonicalizeTopic(rawTopic: string): string {
+  const topic = (rawTopic || '').trim();
+  const lower = topic.toLowerCase();
+
+  if (!topic || lower === 'unknown') {
+    return 'Unknown';
+  }
+
+  const isLoan =
+    /\bloan\b|\bemi\b|home\s*loan/i.test(topic) ||
+    /\u0932\u094b\u0928|\u0915\u0930\u094d\u091c|\u090b\u0923/.test(topic);
+  if (isLoan) {
+    return 'Loan';
+  }
+
+  const isInvestment =
+    /\binvest(ment)?\b|\bsip\b|mutual\s*fund/i.test(topic) ||
+    /\u0928\u093f\u0935\u0947\u0936|\u090f\u0938\u0906\u0908\u092a\u0940|\u092e\u094d\u092f\u0942\u091a\u0941\u0905\u0932/.test(topic);
+  if (isInvestment) {
+    return 'Investment';
+  }
+
+  const cleaned = topic.replace(/[_-]+/g, ' ').trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
 export function DashboardScreen({ refreshKey = 0 }: DashboardScreenProps) {
   const [items, setItems] = useState<InsightCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +99,7 @@ export function DashboardScreen({ refreshKey = 0 }: DashboardScreenProps) {
       else if (sentiment.includes('neg')) sentimentCounts.negative += 1;
       else sentimentCounts.neutral += 1;
 
-      const topic = (item.structured_summary.topic || 'unknown').trim() || 'unknown';
+      const topic = canonicalizeTopic(item.structured_summary.topic || 'unknown');
       topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     }
 
@@ -175,6 +201,146 @@ export function DashboardScreen({ refreshKey = 0 }: DashboardScreenProps) {
     return Array.from(new Set(built)).slice(0, 4);
   }, [simplifiedTerms]);
 
+  const riskDetection = useMemo(() => {
+    if (items.length === 0) {
+      return {
+        score: 0,
+        severity: 'Low',
+        summary: 'No risk signals detected yet.',
+        signals: [] as string[],
+        explanation: 'No conversations available, so risk factors have not been triggered yet.',
+        breakdown: [] as Array<{ label: string; points: number; share: number }>,
+        recommendation: 'Process more conversations to generate a reliable risk profile.',
+      };
+    }
+
+    const recentItems = [...items]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 20);
+
+    let weightedRisk = 0;
+    const triggeredSignals = new Set<string>();
+    const factorTotals = {
+      flagged: 0,
+      lowConfidence: 0,
+      moderateConfidence: 0,
+      negativeSentiment: 0,
+      loanExposure: 0,
+      unclearDecision: 0,
+      missingAmount: 0,
+      baseline: 0,
+    };
+
+    for (const item of recentItems) {
+      let itemRisk = 10;
+      factorTotals.baseline += 10;
+
+      const sentiment = (item.sentiment || '').toLowerCase();
+      const topic = (item.structured_summary.topic || '').toLowerCase();
+      const transcript = (item.raw_transcript || '').toLowerCase();
+      const decision = (item.structured_summary.decision || '').toLowerCase();
+      const nextAction = (item.structured_summary.next_action || '').toLowerCase();
+      const confidence = Number(item.confidence_score || 0);
+
+      if (item.flagged_for_review) {
+        itemRisk += 25;
+        factorTotals.flagged += 25;
+        triggeredSignals.add('Flagged conversations require manual review');
+      }
+
+      if (confidence < 0.45) {
+        itemRisk += 20;
+        factorTotals.lowConfidence += 20;
+        triggeredSignals.add('Low confidence extraction in recent conversations');
+      } else if (confidence < 0.7) {
+        itemRisk += 10;
+        factorTotals.moderateConfidence += 10;
+      }
+
+      if (sentiment.includes('neg') || transcript.includes('stress') || transcript.includes('worried')) {
+        itemRisk += 15;
+        factorTotals.negativeSentiment += 15;
+        triggeredSignals.add('Negative or stressed sentiment detected');
+      }
+
+      if (topic.includes('loan') || transcript.includes('loan') || transcript.includes('emi')) {
+        itemRisk += 10;
+        factorTotals.loanExposure += 10;
+        triggeredSignals.add('Loan-related exposure present');
+      }
+
+      if (decision.includes('none') || decision.includes('unknown') || nextAction.includes('manual review')) {
+        itemRisk += 12;
+        factorTotals.unclearDecision += 12;
+        triggeredSignals.add('Ambiguous decision or unclear next action');
+      }
+
+      const hasAmount =
+        Boolean(item.structured_summary.amount_discussed) ||
+        (Array.isArray(item.financial_entities?.amounts) && item.financial_entities.amounts.length > 0);
+
+      if (!hasAmount) {
+        itemRisk += 8;
+        factorTotals.missingAmount += 8;
+        triggeredSignals.add('Amount details are missing in some conversations');
+      }
+
+      weightedRisk += Math.min(100, itemRisk);
+    }
+
+    const score = Math.round(weightedRisk / recentItems.length);
+
+    const severity = score >= 70 ? 'High' : score >= 40 ? 'Medium' : 'Low';
+    const summary =
+      severity === 'High'
+        ? 'Portfolio conversations show elevated risk indicators.'
+        : severity === 'Medium'
+          ? 'Moderate risk indicators detected; review important cases.'
+          : 'Risk indicators are currently in a stable range.';
+
+    const recommendation =
+      severity === 'High'
+        ? 'Prioritize flagged conversations, validate missing amounts, and confirm decision clarity before proceeding.'
+        : severity === 'Medium'
+          ? 'Review low-confidence conversations and confirm next actions to reduce ambiguity.'
+          : 'Continue monitoring and keep decision/amount confirmations consistent.';
+
+    const totalRiskPoints = Math.max(1, weightedRisk);
+    const breakdown = [
+      { label: 'Flagged conversations', points: factorTotals.flagged },
+      { label: 'Low confidence extraction', points: factorTotals.lowConfidence + factorTotals.moderateConfidence },
+      { label: 'Negative/stress sentiment', points: factorTotals.negativeSentiment },
+      { label: 'Loan/EMI exposure', points: factorTotals.loanExposure },
+      { label: 'Unclear decisions/actions', points: factorTotals.unclearDecision },
+      { label: 'Missing amount details', points: factorTotals.missingAmount },
+    ]
+      .filter((factor) => factor.points > 0)
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 4)
+      .map((factor) => ({
+        ...factor,
+        share: Math.round((factor.points / totalRiskPoints) * 100),
+      }));
+
+    const explanation =
+      breakdown.length === 0
+        ? 'Risk is mostly baseline because no strong risk factor is dominating recent conversations.'
+        : `Risk is elevated mainly due to ${breakdown
+            .slice(0, 2)
+            .map((factor) => `${factor.label.toLowerCase()} (${factor.share}%)`)
+            .join(' and ')}.`;
+
+    return {
+      score,
+      severity,
+      summary,
+      signals: Array.from(triggeredSignals).slice(0, 5),
+      explanation,
+      breakdown,
+      recommendation,
+    };
+  }, [items]);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -250,6 +416,54 @@ export function DashboardScreen({ refreshKey = 0 }: DashboardScreenProps) {
                 </View>
               ))
             )}
+          </View>
+
+          <View style={styles.cardBlock}>
+            <Text style={styles.blockTitle}>Risk Detection</Text>
+            <View style={styles.riskHeader}>
+              <Text style={styles.riskLabel}>Risk Severity: {riskDetection.severity}</Text>
+              <Text
+                style={[
+                  styles.riskValue,
+                  riskDetection.score >= 70
+                    ? styles.riskHigh
+                    : riskDetection.score >= 40
+                      ? styles.riskMedium
+                      : styles.riskLow,
+                ]}
+              >
+                {riskDetection.score}%
+              </Text>
+            </View>
+
+            <View style={styles.riskBarTrack}>
+              <View style={[styles.riskBarFill, { width: `${Math.max(2, riskDetection.score)}%` }]} />
+            </View>
+
+            <Text style={styles.blockBody}>{riskDetection.summary}</Text>
+
+            {riskDetection.signals.length > 0 ? (
+              <>
+                <Text style={styles.sectionTitle}>Detected Signals</Text>
+                {riskDetection.signals.map((signal, index) => (
+                  <Text key={`${signal}-${index}`} style={styles.blockBody}>
+                    - {signal}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+
+            <Text style={styles.sectionTitle}>Risk Explanation</Text>
+            <Text style={styles.sectionBody}>{riskDetection.explanation}</Text>
+            {riskDetection.breakdown.map((factor) => (
+              <View key={factor.label} style={styles.riskBreakdownRow}>
+                <Text style={styles.riskBreakdownLabel}>{factor.label}</Text>
+                <Text style={styles.riskBreakdownValue}>{factor.share}%</Text>
+              </View>
+            ))}
+
+            <Text style={styles.sectionTitle}>Recommendation</Text>
+            <Text style={styles.sectionBody}>{riskDetection.recommendation}</Text>
           </View>
 
         </>
@@ -537,5 +751,59 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     flex: 1,
     lineHeight: 20,
+  },
+  riskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  riskLabel: {
+    color: '#e2e8f0',
+    fontWeight: '700',
+  },
+  riskValue: {
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  riskHigh: {
+    color: '#ef4444',
+  },
+  riskMedium: {
+    color: '#f59e0b',
+  },
+  riskLow: {
+    color: '#22c55e',
+  },
+  riskBarTrack: {
+    width: '100%',
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: '#1f2937',
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  riskBarFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#ef4444',
+  },
+  riskBreakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f2937',
+  },
+  riskBreakdownLabel: {
+    color: '#cbd5e1',
+    flex: 1,
+    paddingRight: 8,
+  },
+  riskBreakdownValue: {
+    color: '#f8fafc',
+    fontWeight: '700',
   },
 });

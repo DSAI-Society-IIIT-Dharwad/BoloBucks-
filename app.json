@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Armour.AI",
+    "slug": "armor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/app-logo.jpeg",
+    "splash": {
+      "image": "./assets/app-logo.jpeg",
+      "resizeMode": "contain",
+      "backgroundColor": "#10b981"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app-logo.jpeg",
+        "backgroundColor": "#10b981"
+      }
+    },
+    "web": {
+      "favicon": "./assets/app-logo.jpeg"
+    }
+  }
+}

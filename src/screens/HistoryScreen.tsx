@@ -648,7 +648,7 @@ export function HistoryScreen({ refreshKey = 0, focusConversationId = null }: Hi
             </div>
 
             <div class="section">
-              <h2>Loan Suggestion Engine (Indicative)</h2>
+              <h2>Options Explored (Indicative)</h2>
               <ul>${loanSuggestionsHtml || '<li>Loan recommendations appear when the conversation is about loans.</li>'}</ul>
             </div>
 

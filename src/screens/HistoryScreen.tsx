@@ -948,44 +948,6 @@ export function HistoryScreen({ refreshKey = 0, focusConversationId = null }: Hi
                   </>
                 ) : null}
 
-                {conversationSummary ? (
-                  <>
-                    <Text style={styles.sectionTitle}>Conversation Summary</Text>
-                    <View style={styles.summaryCard}>
-                      <Text style={styles.summaryText}>{conversationSummary.summaryText}</Text>
-                      {conversationSummary.keyPoints.map((point, index) => (
-                        <Text key={`${point}-${index}`} style={styles.summaryPoint}>
-                          {'- '}
-                          {point}
-                        </Text>
-                      ))}
-                    </View>
-                  </>
-                ) : null}
-
-                <Text style={styles.sectionTitle}>Loan Suggestion Engine</Text>
-                {loanSuggestions.length === 0 ? (
-                  <Text style={styles.sectionBody}>
-                    Loan recommendations appear when the selected conversation is about loans.
-                  </Text>
-                ) : (
-                  <View style={styles.bankSuggestionWrap}>
-                    {loanSuggestions.map((item, index) => (
-                      <View key={`${item.bank}-${index}`} style={styles.bankCard}>
-                        <Text style={styles.bankTitle}>{item.bank}</Text>
-                        <Text style={styles.bankMeta}>{item.product}</Text>
-                        <Text style={styles.bankMeta}>Rate: {item.interestRange}</Text>
-                        <Text style={styles.bankMeta}>Processing Fee: {item.processingFee}</Text>
-                        <Text style={styles.bankMeta}>Max Tenure: {item.maxTenure}</Text>
-                        <Text style={styles.bankWhy}>{item.why}</Text>
-                      </View>
-                    ))}
-                    <Text style={styles.disclaimerText}>
-                      Indicative comparison only. Verify latest rates and eligibility with the bank before deciding.
-                    </Text>
-                  </View>
-                )}
-
                 <Text style={styles.sectionTitle}>Personalized Reminders</Text>
                 <View style={styles.reminderWrap}>
                   {personalizedReminders.map((reminder, index) => (
@@ -1007,16 +969,6 @@ export function HistoryScreen({ refreshKey = 0, focusConversationId = null }: Hi
                       </View>
                       <Text style={styles.reminderDetail}>{reminder.detail}</Text>
                       <Text style={styles.reminderMeta}>{reminder.dueLabel}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <Text style={styles.sectionTitle}>Ideas & Suggestions</Text>
-                <View style={styles.suggestionWrap}>
-                  {intelligence.suggestions.map((suggestion, index) => (
-                    <View key={`${suggestion}-${index}`} style={styles.suggestionCard}>
-                      <Text style={styles.suggestionIndex}>{String(index + 1).padStart(2, '0')}</Text>
-                      <Text style={styles.suggestionText}>{suggestion}</Text>
                     </View>
                   ))}
                 </View>
